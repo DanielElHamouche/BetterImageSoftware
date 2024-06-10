@@ -1,0 +1,125 @@
+import sys
+from PyQt6.QtWidgets import *#QApplication, QMainWindow, QWidget, QGraphicsView, QGraphicsScene
+from PyQt6.QtGui import QPixmap, QColor, QPen, QBrush
+from PyQt6.QtCore import Qt, QRectF, QPointF, QSizeF
+
+zoom_step = 1.2 # Amount by which image will zoom on scrolling
+zoom_scale = 1 #  Scale of image to display on screen
+zoom_level = 0 #  How zoomed in/out the image is
+
+app = QApplication(sys.argv)
+window = QMainWindow()
+centralwidget = QWidget(window)
+layout = QVBoxLayout(centralwidget)
+view = QGraphicsView()
+scene = QGraphicsScene()
+# pixmap = QPixmap('images/largeimage.jpg')
+pixmap = QPixmap('images/pixel.png')
+# pixmap = QPixmap('images/transparent.png')
+
+window.setWindowTitle("Window Title")
+window.setGeometry(800, 50, 500, 500) #app init x, y, w, h
+window.setCentralWidget(centralwidget)
+
+
+layout.setContentsMargins(0,0,0,0)
+layout.addWidget(view)
+
+view.setStyleSheet("background-color: green")
+view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+view.setScene(scene)
+
+image = scene.addPixmap(pixmap)
+image_ratio = pixmap.width()/pixmap.height()
+
+def mousePressEvent(event):
+    print(event)
+
+def keyPressEvent(event):
+    global image, pixmap
+    print(event.key())
+    if   event.key() == Qt.Key.Key_Escape: app.quit()
+    elif event.key() == Qt.Key.Key_F11: window.showNormal() if window.isFullScreen() else window.showFullScreen()
+    elif event.key() == Qt.Key.Key_Right : 
+        pixmap = QPixmap('pixel.png')
+        scene.removeItem(image)
+        image = scene.addPixmap(pixmap)
+        resizeEvent()
+    elif event.key() == Qt.Key.Key_Left : 
+        pixmap = QPixmap('largeimage.jpg')
+        scene.removeItem(image)
+        image = scene.addPixmap(pixmap)
+        resizeEvent()
+    event.accept()
+
+def wheelEvent(event):
+    global zoom_scale, zoom_level, pixmap
+    if event.angleDelta().x() + event.angleDelta().y() > 0:
+        view.scale(zoom_step, zoom_step)
+        # zoom_scale *= zoom_step
+        zoom_level += 1 #if (pixmap.height()*zoom_scale) > view.height() or (pixmap.width() *zoom_scale)> view.width() else zoom_level + 1
+    elif zoom_level > -5:
+        view.scale(1/zoom_step, 1/zoom_step)
+        # zoom_scale /= zoom_step
+        zoom_level -= 1
+    print(round(zoom_scale, 3), zoom_level)
+    updateSceneRect()
+    event.accept()
+
+scene_rect_item = scene.addRect(QRectF(), QPen(QColor(255, 255, 255), 0), QBrush(QColor(255, 0, 0, 100)))
+
+def resizeEvent(event = None):
+    ## FIX ERROR CROPS SMALL PIECE
+    ## FIX ZOOMED IN SCALING
+    global image_ratio, zoom_scale, zoom_level, scene, scene_rect_item
+    view_ratio = view.width()/view.height()
+    widthratio = view.width()/(pixmap.width()*zoom_scale)
+    heightratio = view.height()/(pixmap.height()*zoom_scale)
+    if view_ratio < image_ratio:
+        zoom_scale*= widthratio
+        view.scale(widthratio, widthratio)
+    else:
+        zoom_scale*= heightratio
+        view.scale(heightratio, heightratio)
+    updateSceneRect()
+
+    #elif zoom_level < 0: 
+    #    if heightratio < 1 or widthratio < 1: zoom_level = 0
+    #else:
+    #    pass#print(widthratio, heightratio)
+def updateSceneRect():
+    global scene_rect_item, scene, image
+  # Adjust this value as needed
+    # Get the view's viewport geometry in scene coordinates
+    viewport_rect = view.mapToScene(view.viewport().geometry()).boundingRect()
+    
+    print(viewport_rect.right()-image.sceneBoundingRect().right(), image.sceneBoundingRect().left() - viewport_rect.left())
+    rect = scene.sceneRect()
+    rect.setBottom(-((viewport_rect.top()-image.sceneBoundingRect().top())+(image.sceneBoundingRect().bottom() - viewport_rect.bottom())-pixmap.height()+10)+pixmap.height())
+    rect.setLeft(-((viewport_rect.right()-image.sceneBoundingRect().right())+(image.sceneBoundingRect().left() - viewport_rect.left())+pixmap.width()-10))
+    rect.setTop(((image.sceneBoundingRect().bottom() - viewport_rect.bottom())+(viewport_rect.top() - image.sceneBoundingRect().top())-pixmap.height()+10))
+    rect.setRight(((image.sceneBoundingRect().left() - viewport_rect.left())+(viewport_rect.right() - image.sceneBoundingRect().right())+pixmap.width()-10)+pixmap.width())
+
+
+    # Create a new QRectF with the desired coordinates
+    #rect = QRectF(QPointF(viewport_rect.right()-pixmap.width(), viewport_rect.bottom()-pixmap.height()),
+    #              QPointF(viewport_rect.left()+pixmap.width(), viewport_rect.top()+pixmap.height()))
+    
+    
+
+    scene.setSceneRect(rect)
+    #scene_rect_item.setRect(rect)
+
+
+
+
+view.wheelEvent = wheelEvent
+view.keyPressEvent = keyPressEvent
+window.resizeEvent = resizeEvent
+
+window.showNormal()
+window.resizeEvent()
+
+sys.exit(app.exec())
