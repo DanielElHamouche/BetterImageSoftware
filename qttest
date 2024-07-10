@@ -14,8 +14,8 @@ centralwidget = QWidget(window)
 layout = QVBoxLayout(centralwidget)
 view = QGraphicsView()
 scene = QGraphicsScene()
-pixmap = QPixmap('images/pixel.png')
-# pixmap = QPixmap('images/largeimage.jpg')
+# pixmap = QPixmap('images/pixel.png')
+pixmap = QPixmap('images/largeimage.jpg')
 # pixmap = QPixmap('images/transparent.png')
 
 window.setWindowTitle("Window Title")
@@ -63,11 +63,9 @@ def wheelEvent(event):
     print(round(zoom_scale, 3), zoom_level)
     event.accept()
 
-scene_rect_item = scene.addRect(QRectF(), QPen(QColor(255, 255, 255), 0), QBrush(QColor(255, 0, 0, 100)))
-
 def resizeEvent(event = None):
     ## FIX ERROR CROPS SMALL PIECE
-    global image_ratio, zoom_scale, zoom_level, scene, scene_rect_item
+    global image_ratio, zoom_scale, zoom_level, scene
 
     view_ratio = view.width()/view.height()
     widthratio = view.width()/(pixmap.width()*zoom_scale)
@@ -86,7 +84,7 @@ def resizeEvent(event = None):
     #    pass#print(widthratio, heightratio)
 
 def updateSceneRect():
-    global scene_rect_item, scene, image
+    global scene, image
 
     viewport_rect = view.mapToScene(view.viewport().geometry()).boundingRect()
 
@@ -114,9 +112,7 @@ def updateSceneRect():
     #            viewport_rect.left()-pixmap.width()-right_distance,
     #            viewport_rect.top()-pixmap.height()-bottom_distance))
     
-    # print(pixmap.geom)
     scene.setSceneRect(rect)
-    scene_rect_item.setRect(rect)
     print("Image pos", image.pos().x(), image.pos().y())
 
 view.wheelEvent = wheelEvent
