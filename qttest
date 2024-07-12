@@ -3,6 +3,8 @@
 # Fix image movement and scaling when resizing app
 # maintain image position/[relative scale] when fullscreening app (f11)
 #fix image scrolling? Might not be necesarry
+#Fix view center when zooming, allowing image to grow and maintain position (small issue)
+#Fix image center to viewport center so image loads centered, and still moves properly ( Might not be correct way to fix, and could lead to further issues)
 
 import os, sys
 from PyQt6.QtWidgets import *#QApplication, QMainWindow, QWidget, QGraphicsView, QGraphicsScene
@@ -20,8 +22,8 @@ centralwidget = QWidget(window)
 layout = QVBoxLayout(centralwidget)
 view = QGraphicsView()
 scene = QGraphicsScene()
-# pixmap = QPixmap('images/pixel.png')
-pixmap = QPixmap('images/largeimage.jpg')
+pixmap = QPixmap('images/pixel.png')
+# pixmap = QPixmap('images/largeimage.jpg')
 # pixmap = QPixmap('images/transparent.png')
 
 window.setWindowTitle("Window Title")
@@ -34,7 +36,7 @@ layout.addWidget(view)
 view.setStyleSheet("background-color: green")
 view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
 #view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter) ?does anything
 view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 view.setScene(scene)
@@ -60,7 +62,13 @@ def keyPressEvent(event):
         image_index = (image_index - 1) % len(os.listdir('images'))
         updateImage(image_index)        
     elif event.key() == Qt.Key.Key_Space : updateSceneRect()
+    elif event.key() == Qt.Key.Key_Control :
+        view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
     event.accept()
+
+def keyReleaseEvent(event):
+    if event.key() == Qt.Key.Key_Control : 
+        view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
 
 def wheelEvent(event):
     global zoom_scale, zoom_level, pixmap
@@ -136,7 +144,8 @@ def updateImage( image_index : int):
     resizeEvent()
 
 view.wheelEvent = wheelEvent
-view.keyPressEvent = keyPressEvent
+window.keyPressEvent = keyPressEvent
+window.keyReleaseEvent = keyReleaseEvent
 window.resizeEvent = resizeEvent
 #view.mousePressEvent = mousePressEvent
 
