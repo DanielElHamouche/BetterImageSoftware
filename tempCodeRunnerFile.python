@@ -1,1 +1,1 @@
-pixmap.rect().center()
+pixmap.width()/2

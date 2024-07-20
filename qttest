@@ -4,11 +4,11 @@
 # maintain image position/[relative scale] when fullscreening app (f11)
 #fix image scrolling? Might not be necesarry
 #Fix view center when zooming, allowing image to grow and maintain position (small issue)
-#Fix image center to viewport center so image loads centered, and still moves properly ( Might not be correct way to fix, and could lead to further issues)
+#Fix image center to viewport center so image loads centered, and still moves properly ( Might not be correct way to fix, and could lead to further )
 
 import os, sys
 from PyQt6.QtWidgets import *#QApplication, QMainWindow, QWidget, QGraphicsView, QGraphicsScene
-from PyQt6.QtGui import QPixmap, QColor, QPen, QBrush
+from PyQt6.QtGui import QPixmap, QColor, QPen, QBrush, QTransform
 from PyQt6.QtCore import Qt, QRectF, QPointF, QSizeF
 
 zoom_step = 1.2 # Amount by which image will zoom on scrolling
@@ -23,26 +23,43 @@ layout = QVBoxLayout(centralwidget)
 view = QGraphicsView()
 scene = QGraphicsScene()
 pixmap = QPixmap('images/pixel.png')
+# pixmap = QPixmap('images/DOG.jpg')
 # pixmap = QPixmap('images/largeimage.jpg')
 # pixmap = QPixmap('images/transparent.png')
 
 window.setWindowTitle("Window Title")
-window.setGeometry(800, 50, 1000, 500) #app init x, y, w, h
+window.setGeometry(800, 50, 500, 500) #app init x, y, w, h
 window.setCentralWidget(centralwidget)
 
-layout.setContentsMargins(5,5,5,5)
+layout.setContentsMargins(0,0,0,0)
 layout.addWidget(view)
 
 view.setStyleSheet("background-color: green")
 view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
 #view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter) ?does anything
 view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 view.setScene(scene)
 
+def centerImage():
+    global image, view
+    view_rect = view.viewport().rect()
+    view_center = view.mapToScene(view_rect.center())
+    image_rect = image.sceneBoundingRect()
+    image_center = image_rect.center()
+    
+    # Calculate the difference between the centers
+    diff = view_center - image_center
+    
+    # Move the image by this difference
+    image.setPos(image.pos() + diff)
+    
 image = scene.addPixmap(pixmap)
 image_ratio = pixmap.width()/pixmap.height()
+centerImage()  # Add this line
+
+
 
 def mousePressEvent(event):
     print(event.pos().x(), event.pos().y())
@@ -63,12 +80,12 @@ def keyPressEvent(event):
         updateImage(image_index)        
     elif event.key() == Qt.Key.Key_Space : updateSceneRect()
     elif event.key() == Qt.Key.Key_Control :
-        view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
     event.accept()
 
 def keyReleaseEvent(event):
     if event.key() == Qt.Key.Key_Control : 
-        view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+        view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
 
 def wheelEvent(event):
     global zoom_scale, zoom_level, pixmap
@@ -92,10 +109,10 @@ def resizeEvent(event = None):
     widthratio = view.width()/(pixmap.width()*zoom_scale)
     heightratio = view.height()/(pixmap.height()*zoom_scale)
     if view_ratio < image_ratio:
-        zoom_scale*= widthratio
+        zoom_scale *= widthratio
         view.scale(widthratio, widthratio)
     else:
-        zoom_scale*= heightratio
+        zoom_scale *= heightratio
         view.scale(heightratio, heightratio)
     updateSceneRect()
 
@@ -115,32 +132,29 @@ def updateSceneRect():
     right_distance = viewport_rect.right()-pixmap.width()
         
     # Create a new QRectF with the desired coordinates
-    
-    #Method 1
+
     rect = scene.sceneRect()
     rect.moveCenter(scene.sceneRect().center())
-    rect.setTop(viewport_rect.top()-pixmap.height()-bottom_distance)
-    rect.setLeft(viewport_rect.left()-pixmap.width()-right_distance)
-    rect.setBottom(viewport_rect.bottom()+pixmap.height()+top_distance)
-    rect.setRight(viewport_rect.right()+pixmap.width()+left_distance)
-    
-    #Method 2
-    #rect = QRectF(
-    #        QPointF(
-    #            viewport_rect.right()+pixmap.width()+left_distance,
-    #            viewport_rect.bottom()+pixmap.height()+top_distance),
-    #        QPointF(
-    #            viewport_rect.left()-pixmap.width()-right_distance,
-    #            viewport_rect.top()-pixmap.height()-bottom_distance))
+    print("CENTER CHECK", scene.sceneRect().center())
+    print(viewport_rect)
+    print(rect)
+    rect.setTop(    viewport_rect.top()     - pixmap.height()   * 1.5   - bottom_distance   - 1)
+    rect.setLeft(   viewport_rect.left()    - pixmap.width()    * 1.5   - right_distance    - 1)
+    rect.setBottom( viewport_rect.bottom()  + pixmap.height()   / 2     + top_distance      - 1)
+    rect.setRight(  viewport_rect.right()   + pixmap.width()    / 2     + left_distance     - 1)
     
     scene.setSceneRect(rect)
     print("Image pos", image.pos().x(), image.pos().y())
 
-def updateImage( image_index : int):
+    
+    
+def updateImage(image_index: int):
+    print("UPDATE IMAGE")
     global image, pixmap
     pixmap = QPixmap(os.listdir('Images')[image_index])
     scene.removeItem(image)
     image = scene.addPixmap(pixmap)
+    centerImage()  # Add this line
     resizeEvent()
 
 view.wheelEvent = wheelEvent
