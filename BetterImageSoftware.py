@@ -1,3 +1,8 @@
+#Problems to fix:
+#issue 1
+#Last rescaling issue: portion of image visible changes when resizing and changing aspect ratios
+#ie. image should not scale, but view should expand.
+
 import os, sys
 from PyQt6.QtWidgets import *#QApplication, QMainWindow, QWidget, QGraphicsView, QGraphicsScene
 from PyQt6.QtGui import QPixmap, QColor, QPen, QBrush, QTransform
@@ -17,8 +22,8 @@ view = QGraphicsView()
 scene = QGraphicsScene()
 
 # pixmap = QPixmap('images/pixel.png')
-pixmap = QPixmap('images/DOG.jpg')
-# pixmap = QPixmap('images/largeimage.jpg')
+# pixmap = QPixmap('images/DOG.jpg')
+pixmap = QPixmap('images/largeimage.jpg')
 # pixmap = QPixmap('images/transparent.png')
 
 image = scene.addPixmap(pixmap)
@@ -81,10 +86,10 @@ def resizeEvent(event = None):
     heightratio = view.height()/(pixmap.height()*zoom_scale)
     if view_ratio < image_ratio:
         zoom_scale *= widthratio
-        view.scale(widthratio, widthratio)  
+        view.scale(widthratio, widthratio)  #remove for issue 1 fix
     else:
         zoom_scale *= heightratio 
-        view.scale(heightratio, heightratio)
+        view.scale(heightratio, heightratio) #remove for issue 1 fix
     updateSceneRect()
 
 def updateSceneRect():
