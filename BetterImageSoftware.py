@@ -1,5 +1,5 @@
 #Problems to fix:
-#issue 1
+#issue 1 (minor issues)
 #Last rescaling issue: portion of image visible changes when resizing and changing aspect ratios
 #ie. image should not scale, but view should expand.
 
@@ -45,24 +45,22 @@ view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
 view.setScene(scene)
 
 def keyPressEvent(event):
-    # print(event.key())
-    if   event.key() == Qt.Key.Key_Escape: app.quit()
-    elif event.key() == Qt.Key.Key_F11: 
+    if event.key() == Qt.Key.Key_Escape:
+        app.quit()
+    elif event.key() == Qt.Key.Key_F11:
         view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         window.showNormal() if window.isFullScreen() else window.showFullScreen()
         view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-    elif event.key() == Qt.Key.Key_Control :
+    elif event.key() == Qt.Key.Key_Control:
         view.setDragMode(QGraphicsView.DragMode.NoDrag)
-        #view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
-    #debug
-    elif event.key() == Qt.Key.Key_Space :
+    elif event.key() == Qt.Key.Key_Space:
         resetSceneRect()
     event.accept()
 
 def keyReleaseEvent(event):
-    if event.key() == Qt.Key.Key_Control : 
+    if event.key() == Qt.Key.Key_Control:
         view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
-        #view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+    event.accept()
 
 def wheelEvent(event):
     global zoom_level
@@ -127,11 +125,14 @@ current_rect_item = None
 
 def mousePressEvent(event):
     global startpos, current_rect_item
-    if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+    if Qt.KeyboardModifier.ControlModifier in event.modifiers():
         startpos = view.mapToScene(event.pos())
         # Create initial rectangle
         rect = QRectF(startpos, startpos)
         current_rect_item = scene.addRect(rect, QPen(QColor(0, 0, 0)), QBrush(QColor(255, 0, 0, 50)))
+    else:
+        view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        QGraphicsView.mousePressEvent(view, event)
 
 def mouseMoveEvent(event):
     global current_rect_item, startpos
@@ -139,12 +140,16 @@ def mouseMoveEvent(event):
         current_pos = view.mapToScene(event.pos())
         rect = QRectF(startpos, current_pos).normalized()
         current_rect_item.setRect(rect)
+    else:
+        QGraphicsView.mouseMoveEvent(view, event)
 
 def mouseReleaseEvent(event):
     global current_rect_item, startpos
     if current_rect_item:
         current_rect_item = None
     startpos = None
+    view.setDragMode(QGraphicsView.DragMode.NoDrag)
+    QGraphicsView.mouseReleaseEvent(view, event)
 
 
 
