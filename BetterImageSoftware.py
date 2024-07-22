@@ -21,20 +21,19 @@ layout = QVBoxLayout(centralwidget)
 view = QGraphicsView()
 scene = QGraphicsScene()
 
-# pixmap = QPixmap('images/pixel.png')
+pixmap = QPixmap('images/pixel.png')
 # pixmap = QPixmap('images/DOG.jpg')
-pixmap = QPixmap('images/largeimage.jpg')
+# pixmap = QPixmap('images/largeimage.jpg')
 # pixmap = QPixmap('images/transparent.png')
 
 image = scene.addPixmap(pixmap)
 image_ratio = pixmap.width()/pixmap.height()
-#centerImage()  # Add this line
 
 window.setWindowTitle("Window Title")
 window.setGeometry(300, 50, 500, 500) #app init x, y, w, h
 window.setCentralWidget(centralwidget)
 
-layout.setContentsMargins(50,50,50,50)
+layout.setContentsMargins(0,0,0,0) #L, U, R, D
 layout.addWidget(view)
 
 view.setStyleSheet("background-color: green")
@@ -65,14 +64,11 @@ def wheelEvent(event):
     global zoom_scale, zoom_level, pixmap
     if event.angleDelta().x() + event.angleDelta().y() > 0:
         view.scale(zoom_step, zoom_step)
-        # zoom_scale *= zoom_step
-        zoom_level += 1 #if (pixmap.height()*zoom_scale) > view.height() or (pixmap.width() *zoom_scale)> view.width() else zoom_level + 1
-    elif zoom_level > -99:
+        zoom_level += 1
+    elif zoom_level > -5:
         view.scale(1/zoom_step, 1/zoom_step)
-        # zoom_scale /= zoom_step
         zoom_level -= 1
     updateSceneRect()
-    # print(round(zoom_scale, 3), zoom_level)
     event.accept()
 
 def resizeEvent(event = None):
@@ -97,19 +93,12 @@ def updateSceneRect():
 
     viewport_rect = view.mapToScene(view.viewport().geometry()).boundingRect()
 
-    top_distance = -1 * viewport_rect.top()
-    left_distance = -1 * viewport_rect.left()
-    bottom_distance = viewport_rect.bottom()-pixmap.height()
-    right_distance = viewport_rect.right()-pixmap.width()
-        
-    # Create a new QRectF with the desired coordinates
-
     rect = QRectF()
 
-    rect.setTop(    viewport_rect.top()     - pixmap.height()    - bottom_distance)
-    rect.setLeft(   viewport_rect.left()    - pixmap.width()     - right_distance)
-    rect.setBottom( viewport_rect.bottom()  + pixmap.height()    + top_distance)
-    rect.setRight(  viewport_rect.right()   + pixmap.width()     + left_distance)
+    rect.setTop(    viewport_rect.top()    - viewport_rect.bottom()                )
+    rect.setLeft(   viewport_rect.left()   - viewport_rect.right()                 )
+    rect.setBottom( viewport_rect.bottom() - viewport_rect.top()  + pixmap.height())
+    rect.setRight(  viewport_rect.right()  - viewport_rect.left() + pixmap.width() )
     
     scene.setSceneRect(rect)
 
