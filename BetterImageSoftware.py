@@ -3,11 +3,15 @@
 #Last rescaling issue: portion of image visible changes when resizing and changing aspect ratios
 #ie. image should not scale, but view should expand.
 
+
 #issue 2
 #allow crop from 0,0
 
 #issue 3
 #make zoom limits, ie range of zoom_level dependent on image size. ie not pixel count
+
+#Issue 4
+# fulscreening and not moving mouse results in zooming to incorrect area
 
 from PyQt6.QtWidgets import *#QApplication, QMainWindow, QWidget, QGraphicsView, QGraphicsScene
 from PyQt6.QtGui import QPixmap, QColor, QPen, QBrush, QImage
@@ -28,8 +32,8 @@ layout = QVBoxLayout(centralwidget)
 view = QGraphicsView()
 scene = QGraphicsScene()
 
-# filepath = 'images/DOG.jpg'
-filepath = 'images/pixel.png'
+filepath = 'images/DOG.jpg'
+# filepath = 'images/pixel.png'
 # filepath = 'images/largeimage.jpg'
 
 cv2image = cv2.imread(filepath)
@@ -152,24 +156,29 @@ def drawSceneBorder():
     fill_color = QColor(255, 100, 0, 100)  
     #scene.addRect(rect, QPen(border_color, 20), QBrush(fill_color))
 
-startpos = None
+start_x, start_y = None, None
 
 current_rect_item = None
 
 def mousePressEvent(event):
-    global startpos, current_rect_item
+    global start_x, start_y, current_rect_item
     if Qt.KeyboardModifier.ControlModifier in event.modifiers():
         current_rect_item = None
         for item in scene.items():
             if isinstance(item, QGraphicsRectItem):
                 scene.removeItem(item)
         startpos = view.mapToScene(event.pos())
-        print(startpos, "before")
-        print(event.pos())
-        startpos = QPointF(round(startpos.x()), round(startpos.y()))
-        print(startpos)
+        start_x, start_y = round(startpos.x()), round(startpos.y())
+        print(start_x, start_y)
+        #print(startpos, "before")
+        #print(round(startpos.x()), round(startpos.y()), "ROUND")
+        #print(type(round(startpos.x())), type(round(startpos.y())), "ROUND")
+        #startpos = QPointF(round(x), round(y))
+        #startpos = QPointF(0.0, 0.0)
+        print(startpos, "after")
+        #print('SIR', QPointF(0, 0))
         # Create initial rectangle
-        rect = QRectF(startpos, startpos)
+        rect = QRectF(start_x, start_y, 0, 0)
         current_rect_item = scene.addRect(rect, 
                                   QPen(QColor(0, 0, 0), .1, Qt.PenStyle.SolidLine, Qt.PenCapStyle.SquareCap, Qt.PenJoinStyle.MiterJoin), 
                                   QBrush(QColor(255, 0, 0, 50)))
@@ -179,18 +188,19 @@ def mousePressEvent(event):
         QGraphicsView.mousePressEvent(view, event)
 
 def mouseMoveEvent(event):
-    global current_rect_item, startpos
-    if current_rect_item and startpos:
+    global current_rect_item, start_x, start_y
+    if current_rect_item and not start_x == None:
         current_pos = view.mapToScene(event.pos())
+        end_x, end_y = round(current_pos.x()), round(current_pos.y())
         #current_pos = QPointF(round(current_pos.x()), round(current_pos.y()))
-        rect = QRectF(startpos, current_pos).normalized()
+        rect = QRectF(start_x, start_y, end_x - start_x, end_y - start_y)
         current_rect_item.setRect(rect)
     else:
         QGraphicsView.mouseMoveEvent(view, event)
 
 def mouseReleaseEvent(event):
-    global current_rect_item, startpos
-    startpos = None
+    global current_rect_item, start_x, start_y
+    start_x, start_y = None, None
     view.setDragMode(QGraphicsView.DragMode.NoDrag)
     QGraphicsView.mouseReleaseEvent(view, event)
 
