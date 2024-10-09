@@ -1,239 +1,270 @@
-#Problems to fix:
-#issue 1 (minor issues)
-#Last rescaling issue: portion of image visible changes when resizing and changing aspect ratios
-#ie. image should not scale, but view should expand.
+from PyQt6.QtGui import *
+from PyQt6.QtCore import *
+from PyQt6.QtWidgets import *
+import random
 
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
 
-#issue 2
-#allow crop from 0,0
+        self.setWindowTitle("Better Image Software")
+        self.setGeometry(200, 50, 600, 500)
 
-#issue 3
-#make zoom limits, ie range of zoom_level dependent on image size. ie not pixel count
+        self.centralWidget = CentralWidget()
+        self.setCentralWidget(self.centralWidget)
 
-#Issue 4
-# fulscreening and not moving mouse results in zooming to incorrect area
+        self.menu = self.menuBar()
+        self.file_menu = self.menu.addMenu("&File")
+        self.button_open_file = QAction("&Open File  (Ctrl + O)")
+        self.button_open_file.triggered.connect(self.dialog_open_file)
+        self.file_menu.addAction(self.button_open_file)
 
-from PyQt6.QtWidgets import *#QApplication, QMainWindow, QWidget, QGraphicsView, QGraphicsScene
-from PyQt6.QtGui import QPixmap, QColor, QPen, QBrush, QImage
-from PyQt6.QtCore import Qt, QRectF, QPointF
-import os, sys
-import cv2
+    def dialog_open_file(self):
+        dialog = QFileDialog()
+        file, _ = dialog.getOpenFileName(self, "Select an Image", filter="Images (*.png *.jpg *.jpeg *.bmp *.gif)")
+        if file:
+            self.centralWidget.view.setImage(file)
 
+    def keyPressEvent(self, event: QKeyEvent | None):
+        if event.key() == Qt.Key.Key_Escape:
+            QApplication.quit()
+        elif event.key() == Qt.Key.Key_F11:
+            self.centralWidget.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+            window.showNormal() if window.isFullScreen() else window.showFullScreen()
+            self.centralWidget.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        elif event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_O:
+            self.dialog_open_file()
+        elif event.key() == Qt.Key.Key_1:
+            if self.centralWidget.view.image:
+                self.centralWidget.view.toggleCrop()
+        elif event.key() == Qt.Key.Key_2:
+            print(self.centralWidget.view.crop_selection.rect())
+        return super().keyPressEvent(event)
+    
+    def resizeEvent(self, event):
+        self.centralWidget.view.scaleView(None)
 
-zoom_step = 1.2 # Amount by which image will zoom on scrolling
-zoom_scale = 1 #  Scale of image to display on screen
-zoom_level = 0 #  How zoomed in/out the image is
-image_index = 0
+class CentralWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        layout = QVBoxLayout()
+        self.view = ImageViewer()
+        layout.addWidget(self.view)
+        layout.setContentsMargins(30, 30, 30, 30)
+        self.setLayout(layout)
+        
+class ImageViewer(QGraphicsView):
+    def __init__(self):
+        super().__init__()
+
+        self.scene = QGraphicsScene()
+        self.setScene(self.scene)
+
+        self.setStyleSheet("background-color: gray;")
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+
+        self.zoom_level = 1.0
+        self.image, self.pixmap = None, None
+
+        self.crop_overlay = None
+        self.crop_selection = None
+        self.is_cropping = False
+
+    def setImage(self, path):
+        self.is_cropping = False #?
+        self.zoom_level = 1.0
+        self.resetTransform()
+        self.scene.clear()
+        self.pixmap = QPixmap(path)
+        self.image = self.scene.addPixmap(self.pixmap)
+        self.scaleView(None)
+        self.centerOn(self.pixmap.width()/2, self.pixmap.height()/2)
+    
+    def mousePressEvent(self, event):
+        #self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        #super().mousePressEvent(event)
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        # self.setDragMode(QGraphicsView.DragMode.NoDrag)
+        super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event):
+        if self.image:
+            factor = 1.1 if event.angleDelta().y() > 0 else 0.9
+            #self.zoom_level *= factor
+            self.scale(factor, factor)
+            self.updateSceneRect()
+
+    def scaleView(self, event):
+        if self.image:
+            width_scale  = self.width() / self.pixmap.width()
+            height_scale = self.height() / self.pixmap.height()
+            scale_factor = min(width_scale, height_scale) / self.zoom_level
+            self.zoom_level *= scale_factor
+            self.scale(scale_factor, scale_factor)
+            self.updateSceneRect()
+    
+    def updateSceneRect(self):
+        viewport_rect = self.mapToScene(self.viewport().geometry()).boundingRect()
+        rect = QRectF()
+        rect.setTop(    viewport_rect.top()    - viewport_rect.bottom()                     )
+        rect.setLeft(   viewport_rect.left()   - viewport_rect.right()                      )
+        rect.setBottom( viewport_rect.bottom() - viewport_rect.top()  + self.pixmap.height())
+        rect.setRight(  viewport_rect.right()  - viewport_rect.left() + self.pixmap.width() )
+        self.scene.setSceneRect(rect)
+
+    def toggleCrop(self):
+        if self.is_cropping:
+            self.is_cropping = False
+            self.scene.removeItem(self.crop_overlay)
+            self.scene.removeItem(self.crop_selection)
+        else:
+            self.is_cropping = True
+            self.crop_overlay = CropOverlay(self.scene)
+            self.scene.addItem(self.crop_overlay)
+            self.crop_selection = CropSelection(0, 0, self.pixmap.width(), self.pixmap.height(), self.crop_overlay)
+            self.scene.addItem(self.crop_selection)
+            self.crop_overlay.setCropSelection(self.crop_selection.rect())
+            self.update()
+
+class CropOverlay(QGraphicsItem):
+    def __init__(self, scene):
+        super().__init__()
+        self.scene = scene
+        self.crop_selection = QRectF()
+    
+    def boundingRect(self):
+            return self.scene.sceneRect()
+
+    def paint(self, painter, option, widget):
+        path = QPainterPath()
+        path.addRect(self.scene.sceneRect())
+        path.addRect(self.crop_selection)
+        #path.setFillRule(Qt.FillRule.OddEvenFill)
+        painter.setBrush(QColor(0, 0, 0, 128))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawPath(path)
+
+    def setCropSelection(self, crop_selection):
+        self.crop_selection = crop_selection
+        self.update()
+
+class CropSelection(QGraphicsRectItem):
+    def __init__(self, x, y, width, height, crop_overlay):
+        super().__init__(x, y, width, height)
+
+        self.crop_overlay = crop_overlay
+        self.setPen(QPen(Qt.GlobalColor.black, .5, join=Qt.PenJoinStyle.MiterJoin))
+        self.setAcceptHoverEvents(True)
+        
+        self.handles = {}
+        self.handlesize = 5
+        self.updateHandles()
+        self.start_pos = None
+
+    def updateHandles(self):
+        s = self.handlesize
+        b = self.boundingRect()
+        self.handles = {
+            'tl': QRectF(b.left(), b.top(), s, s),
+            'tr': QRectF(b.right() - s, b.top(), s, s),
+            'bl': QRectF(b.left(), b.bottom() - s, s, s),
+            'br': QRectF(b.right() - s, b.bottom() - s, s, s),
+            'tm': QRectF(b.center().x() - s / 2, b.top(), s, s),
+            'bm': QRectF(b.center().x() - s / 2, b.bottom() - s, s, s),
+            'lm': QRectF(b.left(), b.center().y() - s / 2, s, s),
+            'rm': QRectF(b.right() - s, b.center().y() - s / 2, s, s)
+        }
+
+    def handleAt(self, point):
+        for k, v in self.handles.items():
+            if v.contains(point):
+                return k
+        return None
+    
+    def hoverMoveEvent(self, event): #Inefficient as check through each handle every tick
+        handle = self.handleAt(event.pos())
+        cursor = Qt.CursorShape.ArrowCursor
+        if handle is not None:
+            if handle in ['tl', 'br']:
+                cursor = Qt.CursorShape.SizeFDiagCursor
+            elif handle in ['tr', 'bl']:
+                cursor = Qt.CursorShape.SizeBDiagCursor
+            elif handle in ['tm', 'bm']:
+                cursor = Qt.CursorShape.SizeVerCursor
+            elif handle in ['lm', 'rm']:
+                cursor = Qt.CursorShape.SizeHorCursor
+        self.setCursor(cursor)
+        # super().hoverMoveEvent(event)
+
+    def interactiveResize(self, mouse_pos):
+        offset = mouse_pos - self.start_pos
+        rect = self.mouse_press_rect
+        mode = self.resize_mode
+
+        if mode == 'tl':
+            rect = rect.adjusted(offset.x(), offset.y(), 0, 0)
+        elif mode == 'tr':
+            rect = rect.adjusted(0, offset.y(), offset.x(), 0)
+        elif mode == 'bl':
+            rect = rect.adjusted(offset.x(), 0, 0, offset.y())
+        elif mode == 'br':
+            rect = rect.adjusted(0, 0, offset.x(), offset.y())
+        elif mode == 'tm':
+            rect = rect.adjusted(0, offset.y(), 0, 0)
+        elif mode == 'bm':
+            rect = rect.adjusted(0, 0, 0, offset.y())
+        elif mode == 'lm':
+            rect = rect.adjusted(offset.x(), 0, 0, 0)
+        elif mode == 'rm':
+            rect = rect.adjusted(0, 0, offset.x(), 0)
+        
+        self.setRect(rect.normalized().toRect().toRectF())
+        self.updateHandles()
+
+    def mousePressEvent(self, event):
+        if Qt.KeyboardModifier.ControlModifier not in event.modifiers():
+            self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)  
+        self.start_pos = event.pos()
+        self.mouse_press_rect = self.rect()
+        self.resize_mode = self.handleAt(event.pos())
+        if self.resize_mode:
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.resize_mode:
+            self.interactiveResize(event.pos())
+        elif self.start_pos:
+            new_pos = self.pos() + event.pos() - self.start_pos
+            self.setPos(new_pos.toPoint().toPointF())
+        else:
+            super().mouseMoveEvent(event)
+        self.crop_overlay.setCropSelection(self.mapRectToScene(self.rect()))
+
+    def mouseReleaseEvent(self, event):
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)  
+        self.resize_mode = None
+        self.start_pos = None
+        self.update()
+
+    def paint(self, painter, option, widget=None):
+        super().paint(painter, option, widget)
+        painter.setPen(QPen(QColor(0, 0, 0), .5, Qt.PenStyle.SolidLine, join = Qt.PenJoinStyle.RoundJoin))
+        painter.setBrush(QBrush(QColor(255, 255, 255), Qt.BrushStyle.SolidPattern))
+        for handle in self.handles.values():
+            painter.drawRect(handle)
 
 app = QApplication([])
-window = QMainWindow()
-centralwidget = QWidget(window)
-layout = QVBoxLayout(centralwidget)
-view = QGraphicsView()
-scene = QGraphicsScene()
-
-filepath = 'images/DOG.jpg'
-# filepath = 'images/pixel.png'
-# filepath = 'images/largeimage.jpg'
-
-cv2image = cv2.imread(filepath)
-pixmap = QPixmap(filepath)
-image = scene.addPixmap(pixmap)
-image_ratio = pixmap.width()/pixmap.height()
-
-
-window.setWindowTitle("Window Title")
-window.setGeometry(300, 50, 500, 500) #app init x, y, w, h
-window.setCentralWidget(centralwidget)
-
-layout.setContentsMargins(0,0,0,0) #L, U, R, D
-layout.addWidget(view)
-
-view.setStyleSheet("background-color: gray")
-view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-view.setDragMode(QGraphicsView.DragMode.NoDrag)
-view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
-view.setScene(scene)
-
-def keyPressEvent(event):
-    global current_rect_item, cv2image, scene, image
-    if event.key() == Qt.Key.Key_Escape:
-        app.quit()
-    elif event.key() == Qt.Key.Key_F11:
-        view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
-        window.showNormal() if window.isFullScreen() else window.showFullScreen()
-        view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-    elif event.key() == Qt.Key.Key_Control:
-        if view.dragMode() == QGraphicsView.DragMode.ScrollHandDrag:
-            view.setDragMode(QGraphicsView.DragMode.NoDrag)
-    elif event.key() == Qt.Key.Key_Space:
-        if current_rect_item:
-            rect = current_rect_item.rect()
-            print(rect.x(), rect.y(), rect.x() + rect.width(), rect.y()+rect.height())
-            
-            y_start = max(0, int(rect.y()))
-            y_end = min(cv2image.shape[0], int(rect.y() + rect.height()))
-            x_start = max(0, int(rect.x()))
-            x_end = min(cv2image.shape[1], int(rect.x() + rect.width()))
-
-            imagecrop = cv2image[y_start:y_end, x_start:x_end]
-            pixmap = cv2_to_pixmap(imagecrop)
-            scene.removeItem(image)
-            image = scene.addPixmap(pixmap)
-            resizeEvent()
-            
-    event.accept()
-
-def cv2_to_pixmap(cv2_image):
-    # Convert BGR to RGB
-    rgb_image = cv2.cvtColor(cv2_image, cv2.COLOR_BGR2RGB)
-    
-    # Get the shape of the image
-    height, width, _ = rgb_image.shape
-    
-    # Create QImage from numpy array
-    bytes_per_line = 3 * width
-    q_image = QImage(rgb_image.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
-    
-    # Convert QImage to QPixmap
-    pixmap = QPixmap.fromImage(q_image)
-    
-    return pixmap
-
-
-def wheelEvent(event):
-    global zoom_level
-    if event.angleDelta().x() + event.angleDelta().y() > 0:
-        view.scale(zoom_step, zoom_step)
-        zoom_level += 1
-    elif zoom_level > -5:
-        view.scale(1/zoom_step, 1/zoom_step)
-        zoom_level -= 1
-    updateSceneRect()
-    event.accept()
-
-def resizeEvent(event = None):
-    ## FIX ERROR CROPS SMALL PIECE
-    global image_ratio, zoom_scale
-    view_ratio = view.width()/view.height()
-    widthratio = view.width()/(pixmap.width()*zoom_scale)
-    heightratio = view.height()/(pixmap.height()*zoom_scale)
-    if view_ratio < image_ratio:
-        zoom_scale *= widthratio
-        view.scale(widthratio, widthratio)  #remove for issue 1 fix
-    else:
-        zoom_scale *= heightratio 
-        view.scale(heightratio, heightratio) #remove for issue 1 fix
-    updateSceneRect()
-
-def updateSceneRect():
-    global scene
-
-    viewport_rect = view.mapToScene(view.viewport().geometry()).boundingRect()
-
-    rect = QRectF()
-
-    rect.setTop(    viewport_rect.top()    - viewport_rect.bottom()                )
-    rect.setLeft(   viewport_rect.left()   - viewport_rect.right()                 )
-    rect.setBottom( viewport_rect.bottom() - viewport_rect.top()  + pixmap.height())
-    rect.setRight(  viewport_rect.right()  - viewport_rect.left() + pixmap.width() )
-    
-    scene.setSceneRect(rect)
-    drawSceneBorder()
-
-#debug
-def resetSceneRect():
-    global scene, image
-    scene.setSceneRect(image.sceneBoundingRect())
-    drawSceneBorder()
-#debug
-def drawSceneBorder():
-    global scene
-    rect = scene.sceneRect()
-    border_color = QColor(0, 0, 0)  # Red
-    fill_color = QColor(255, 100, 0, 100)  
-    #scene.addRect(rect, QPen(border_color, 20), QBrush(fill_color))
-
-start_x, start_y = None, None
-
-current_rect_item = None
-
-def mousePressEvent(event):
-    global start_x, start_y, current_rect_item
-    if Qt.KeyboardModifier.ControlModifier in event.modifiers():
-        current_rect_item = None
-        for item in scene.items():
-            if isinstance(item, QGraphicsRectItem):
-                scene.removeItem(item)
-        startpos = view.mapToScene(event.pos())
-        start_x, start_y = round(startpos.x()), round(startpos.y())
-        print(start_x, start_y)
-        #print(startpos, "before")
-        #print(round(startpos.x()), round(startpos.y()), "ROUND")
-        #print(type(round(startpos.x())), type(round(startpos.y())), "ROUND")
-        #startpos = QPointF(round(x), round(y))
-        #startpos = QPointF(0.0, 0.0)
-        print(startpos, "after")
-        #print('SIR', QPointF(0, 0))
-        # Create initial rectangle
-        rect = QRectF(start_x, start_y, 0, 0)
-        current_rect_item = scene.addRect(rect, 
-                                  QPen(QColor(0, 0, 0), .1, Qt.PenStyle.SolidLine, Qt.PenCapStyle.SquareCap, Qt.PenJoinStyle.MiterJoin), 
-                                  QBrush(QColor(255, 0, 0, 50)))
-    else:
-        pass
-        view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
-        QGraphicsView.mousePressEvent(view, event)
-
-def mouseMoveEvent(event):
-    global current_rect_item, start_x, start_y
-    if current_rect_item and not start_x == None:
-        current_pos = view.mapToScene(event.pos())
-        end_x, end_y = round(current_pos.x()), round(current_pos.y())
-        #current_pos = QPointF(round(current_pos.x()), round(current_pos.y()))
-        rect = QRectF(start_x, start_y, end_x - start_x, end_y - start_y)
-        current_rect_item.setRect(rect)
-    else:
-        QGraphicsView.mouseMoveEvent(view, event)
-
-def mouseReleaseEvent(event):
-    global current_rect_item, start_x, start_y
-    start_x, start_y = None, None
-    view.setDragMode(QGraphicsView.DragMode.NoDrag)
-    QGraphicsView.mouseReleaseEvent(view, event)
-
-
-
-view.wheelEvent = wheelEvent
-window.keyPressEvent = keyPressEvent
-window.resizeEvent = resizeEvent
-
-view.mousePressEvent = mousePressEvent
-view.mouseMoveEvent = mouseMoveEvent
-view.mouseReleaseEvent = mouseReleaseEvent
-
-window.showNormal()
-window.resizeEvent()
-
-sys.exit(app.exec())
-
-#Switch Image
-#pixmap = QPixmap('newimage')
-#scene.removeItem(image)
-#image = scene.addPixmap(pixmap)
-#resizeEvent()
-
-# def updateImage(image_index: int):
-    # print("UPDATE IMAGE")
-    # global image, pixmap
-    # pixmap = QPixmap(os.listdir('Images')[image_index])
-    # scene.removeItem(image)
-    # image = scene.addPixmap(pixmap)
-    # centerImage()  # Add this line
-    # resizeEvent()
-
-# for attribute in dir(event):
-#         if not attribute.startswith('__'):
-#             print(attribute)
+window = MainWindow()
+window.show()
+app.exec()
