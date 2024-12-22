@@ -1,7 +1,6 @@
 from PyQt6.QtGui import *
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
-import random
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -25,7 +24,7 @@ class MainWindow(QMainWindow):
         if file:
             self.centralWidget.view.setImage(file)
 
-    def keyPressEvent(self, event: QKeyEvent | None):
+    def keyPressEvent(self, event: QKeyEvent | None): #Switch to a dict for better organization and faster lookup
         if event.key() == Qt.Key.Key_Escape:
             QApplication.quit()
         elif event.key() == Qt.Key.Key_F11:
@@ -34,11 +33,18 @@ class MainWindow(QMainWindow):
             self.centralWidget.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         elif event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_O:
             self.dialog_open_file()
+        elif event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_C:
+            print("KeyBind [CTRL+C] -> Copy")
+        elif event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_V:
+            print("KeyBind [CTRL+V] -> Paste")
         elif event.key() == Qt.Key.Key_1:
+            print("KeyBind [1] -> toggleCrop")
             if self.centralWidget.view.image:
                 self.centralWidget.view.toggleCrop()
         elif event.key() == Qt.Key.Key_2:
-            print(self.centralWidget.view.crop_selection.rect())
+            print("KeyBind [2] -> print crop_selection.rect()")
+            if self.centralWidget.view.crop_selection:
+                print(self.centralWidget.view.crop_selection.rect())
         return super().keyPressEvent(event)
     
     def resizeEvent(self, event):
