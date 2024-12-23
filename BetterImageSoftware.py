@@ -2,6 +2,14 @@ from PyQt6.QtGui import *
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 
+import win32clipboard as win32cb
+import os
+
+
+CF_FILENAMEW = win32cb.RegisterClipboardFormat('FileNameW')
+CF_PNG       = win32cb.RegisterClipboardFormat('PNG')
+CF_TEXT      = win32cb.CF_TEXT
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -24,6 +32,25 @@ class MainWindow(QMainWindow):
         if file:
             self.centralWidget.view.setImage(file)
 
+    def paste(self):
+        print("PASTING")
+        win32cb.OpenClipboard()
+        if win32cb.IsClipboardFormatAvailable(CF_FILENAMEW): # CF_FILENAMEW -> 49159
+            cb_data = win32cb.GetClipboardData(CF_FILENAMEW)
+            img_path = cb_data.decode('utf-16le').rstrip('\x00') #Windows' internal APIs use UTF-16LE and trailing \x00 for null terminator
+            self.centralWidget.view.setImage(img_path)
+
+        elif win32cb.IsClipboardFormatAvailable(CF_PNG): # CF_PNG -> 49341
+            cb_data = win32cb.GetClipboardData(CF_PNG) #Bytes
+            self.centralWidget.view.setImage(cb_data)
+
+        elif win32cb.IsClipboardFormatAvailable(CF_TEXT): # CF_TEXT -> 1
+            cb_data = win32cb.GetClipboardData(CF_TEXT)
+            img_path = cb_data.decode('utf-8')
+            if os.path.exists(img_path):
+                self.centralWidget.view.setImage(img_path)
+        win32cb.CloseClipboard()
+        
     def keyPressEvent(self, event: QKeyEvent | None): #Switch to a dict for better organization and faster lookup
         if event.key() == Qt.Key.Key_Escape:
             QApplication.quit()
@@ -37,6 +64,7 @@ class MainWindow(QMainWindow):
             print("KeyBind [CTRL+C] -> Copy")
         elif event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_V:
             print("KeyBind [CTRL+V] -> Paste")
+            self.paste()
         elif event.key() == Qt.Key.Key_1:
             print("KeyBind [1] -> toggleCrop")
             if self.centralWidget.view.image:
@@ -81,12 +109,16 @@ class ImageViewer(QGraphicsView):
         self.crop_selection = None
         self.is_cropping = False
 
-    def setImage(self, path):
+    def setImage(self, img : str | bytes): #img is a filepath or bytes of img data
         self.is_cropping = False #?
         self.zoom_level = 1.0
         self.resetTransform()
         self.scene.clear()
-        self.pixmap = QPixmap(path)
+        self.pixmap = QPixmap()
+        if isinstance(img, str):
+            self.pixmap.load(img)
+        elif isinstance(img, bytes):
+            self.pixmap.loadFromData(img)
         self.image = self.scene.addPixmap(self.pixmap)
         self.scaleView(None)
         self.centerOn(self.pixmap.width()/2, self.pixmap.height()/2)
