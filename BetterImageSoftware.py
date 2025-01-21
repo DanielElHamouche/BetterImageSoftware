@@ -2,20 +2,42 @@ from PyQt6.QtGui import *
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 
-import win32clipboard as win32cb
+import win32clipboard as win32cb #Copy Pasting Functionality
+import win32api
+from io import BytesIO
 import os
 
+#TEMP FIX
+from PIL import Image
+def convert_dib_to_png_bytes(dib_data: bytes) -> bytes:
+    # Open the DIBV5 data using Pillow
+    with BytesIO(dib_data) as input_stream:
+        pil_image = Image.open(input_stream)
+
+        # Save the image to a PNG format in memory
+        with BytesIO() as output_stream:
+            pil_image.save(output_stream, format="PNG")
+            png_data = output_stream.getvalue()
+
+    return png_data
 
 CF_FILENAMEW = win32cb.RegisterClipboardFormat('FileNameW')
 CF_PNG       = win32cb.RegisterClipboardFormat('PNG')
 CF_TEXT      = win32cb.CF_TEXT
+CF_DIBV5     = win32cb.CF_DIBV5
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Better Image Software")
-        self.setGeometry(200, 50, 600, 500)
+        self.setWindowTitle("Better Image Software : ALPHA")
+
+        init_window_w, init_window_h = 750, 750 
+        display_w = win32api.GetSystemMetrics(0)
+        display_h = win32api.GetSystemMetrics(1)
+
+        print(display_w, display_h)
+        self.setGeometry(int((display_w/2)-(init_window_w/2)), int((display_h/2)-(init_window_h/2)), init_window_w, init_window_h)
 
         self.centralWidget = CentralWidget()
         self.setCentralWidget(self.centralWidget)
@@ -28,29 +50,10 @@ class MainWindow(QMainWindow):
 
     def dialog_open_file(self):
         dialog = QFileDialog()
-        file, _ = dialog.getOpenFileName(self, "Select an Image", filter="Images (*.png *.jpg *.jpeg *.bmp *.gif)")
+        file, _ = dialog.getOpenFileName(self, "Select an Image", filter="Images (*.png *.jpg *.jpeg *.bmp *.gif)") #Update later to be generated from an array
         if file:
             self.centralWidget.view.setImage(file)
 
-    def paste(self):
-        print("PASTING")
-        win32cb.OpenClipboard()
-        if win32cb.IsClipboardFormatAvailable(CF_FILENAMEW): # CF_FILENAMEW -> 49159
-            cb_data = win32cb.GetClipboardData(CF_FILENAMEW)
-            img_path = cb_data.decode('utf-16le').rstrip('\x00') #Windows' internal APIs use UTF-16LE and trailing \x00 for null terminator
-            self.centralWidget.view.setImage(img_path)
-
-        elif win32cb.IsClipboardFormatAvailable(CF_PNG): # CF_PNG -> 49341
-            cb_data = win32cb.GetClipboardData(CF_PNG) #Bytes
-            self.centralWidget.view.setImage(cb_data)
-
-        elif win32cb.IsClipboardFormatAvailable(CF_TEXT): # CF_TEXT -> 1
-            cb_data = win32cb.GetClipboardData(CF_TEXT)
-            img_path = cb_data.decode('utf-8')
-            if os.path.exists(img_path):
-                self.centralWidget.view.setImage(img_path)
-        win32cb.CloseClipboard()
-        
     def keyPressEvent(self, event: QKeyEvent | None): #Switch to a dict for better organization and faster lookup
         if event.key() == Qt.Key.Key_Escape:
             QApplication.quit()
@@ -62,9 +65,13 @@ class MainWindow(QMainWindow):
             self.dialog_open_file()
         elif event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_C:
             print("KeyBind [CTRL+C] -> Copy")
+            self.copy()
         elif event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_V:
             print("KeyBind [CTRL+V] -> Paste")
             self.paste()
+        elif event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_S:
+            print("KeyBind [CTRL+S] -> Save")
+            self.save()
         elif event.key() == Qt.Key.Key_1:
             print("KeyBind [1] -> toggleCrop")
             if self.centralWidget.view.image:
@@ -74,6 +81,77 @@ class MainWindow(QMainWindow):
             if self.centralWidget.view.crop_selection:
                 print(self.centralWidget.view.crop_selection.rect())
         return super().keyPressEvent(event)
+    
+    def copy(self):
+        return
+        img = self.centralWidget.view.pixmap.toImage()
+        buffer = QByteArray()  # Create a QByteArray buffer
+        qbuffer = QBuffer(buffer)  # Wrap the QByteArray in a QBuffer
+        qbuffer.open(QIODevice.OpenModeFlag.ReadWrite)  # Open the buffer for writing
+
+        # Save the QImage to the QBuffer as a PNG
+        img.save(qbuffer, "PNG")
+
+        # Get the byte data from the buffer
+        image_bytes = buffer.data()
+        print(image_bytes)
+
+    def paste(self):
+        print("PASTING")
+        win32cb.OpenClipboard()
+        if win32cb.IsClipboardFormatAvailable(CF_PNG): # CF_PNG -> 49341
+            print('CF_PNG')
+            cb_data = win32cb.GetClipboardData(CF_PNG) #Bytes
+            self.centralWidget.view.setImage(cb_data)
+
+        ###FIX for img copied from web
+        elif win32cb.IsClipboardFormatAvailable(CF_DIBV5): # CF_DIBV5 -> 17
+            print('CF_DIBV5')
+            cb_data = win32cb.GetClipboardData(CF_DIBV5) #Bytes
+            cb_data = convert_dib_to_png_bytes(cb_data) #TEMP FIX CONVERT DIBV5 BYTES TO PNG BYTES
+            self.centralWidget.view.setImage(cb_data)
+
+        elif win32cb.IsClipboardFormatAvailable(CF_FILENAMEW): # CF_FILENAMEW -> 49159
+            print('CF_FILENAMEW')
+            cb_data = win32cb.GetClipboardData(CF_FILENAMEW)
+            img_path = cb_data.decode('utf-16le').rstrip('\x00') #Windows' internal APIs use UTF-16LE and trailing \x00 for null terminator
+            self.centralWidget.view.setImage(img_path)
+
+        elif win32cb.IsClipboardFormatAvailable(CF_TEXT): # CF_TEXT -> 1
+            print('CF_TEXT')
+            cb_data = win32cb.GetClipboardData(CF_TEXT)
+            img_path = cb_data.decode('utf-8')
+            if os.path.exists(img_path):
+                self.centralWidget.view.setImage(img_path)
+        win32cb.CloseClipboard()
+
+    def save(self):
+        """
+        Problem to solve (Many):
+        Going to tackle this problem later as it is very complex.
+        Current problem is dealing with all the different image types and flexibility of compression/metadata/quality
+        Image Formats Defaults should be stored like so:
+        https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html#png-saving
+        PNG -> PNG : max compression | metadata (y|n)
+        JPG -> JPG : Quality 100
+        """
+        img = self.centralWidget.view.pixmap.toImage()
+        print(type(img))
+
+        buffer = QBuffer()
+        buffer.setData(QByteArray())  # Initialize the buffer with an empty byte array
+        buffer.open(QBuffer.OpenModeFlag.WriteOnly)
+        
+        # Save QImage to the buffer in PNG format (you can change format)
+        img.save(buffer, "PNG")
+        
+        # Get the raw image data from the buffer
+        byte_data = buffer.data()
+
+        # Convert byte data to a bytes-like object that Pillow can work with
+        pil_image = Image.open(BytesIO(byte_data))
+        # pil_image.save('output_image.webp', format='WebP', lossless = True, quality = 100)
+        pil_image.save('output.png', format='PNG', optimize = True)
     
     def resizeEvent(self, event):
         self.centralWidget.view.scaleView(None)
@@ -109,19 +187,25 @@ class ImageViewer(QGraphicsView):
         self.crop_selection = None
         self.is_cropping = False
 
-    def setImage(self, img : str | bytes): #img is a filepath or bytes of img data
+    def setImage(self, data : str | bytes): #img is a str filepath or bytes of img data
+        """
+        Currently converting filepath to bytes in function. 
+        Should be out of prior responsibility: fix later.
+        """
         self.is_cropping = False #?
         self.zoom_level = 1.0
         self.resetTransform()
         self.scene.clear()
         self.pixmap = QPixmap()
-        if isinstance(img, str):
-            self.pixmap.load(img)
-        elif isinstance(img, bytes):
-            self.pixmap.loadFromData(img)
+        if isinstance(data, str):
+            with open(data, "rb") as image_file:
+                data = image_file.read()
+                print('convert')
+        if isinstance(data, bytes):
+            self.pixmap.loadFromData(data)
         self.image = self.scene.addPixmap(self.pixmap)
         self.scaleView(None)
-        self.centerOn(self.pixmap.width()/2, self.pixmap.height()/2)
+        self.centerOn(self.pixmap.width()/2, self.pixmap.height()/2)        
     
     def mousePressEvent(self, event):
         #self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
@@ -174,6 +258,31 @@ class ImageViewer(QGraphicsView):
             self.crop_overlay.setCropSelection(self.crop_selection.rect())
             self.update()
 
+
+    #Drag and Drop
+    """
+    For some reason QDragEnterEvent, dragLeaveEvent, dragMoveEvent
+    need to be present for dropEvent to function.
+    Additionally, QDragEnterEvent needs to be present; not dragEnterEvent.
+    Something to look into later
+    """
+    def QDragEnterEvent(self, event):
+        pass
+    def dragLeaveEvent(self, event):
+        pass
+    def dragMoveEvent(self, event):
+        pass
+
+    def dropEvent(self, event):
+        print("DROPEVENT")
+        data = event.mimeData()
+        print(data.text()) #Add functionality to get images from drag and drop from web (ie requests)
+        if url := data.urls():
+            url = url[0]
+            self.setImage(url.toString().split('///')[1]) #url is formatted 'file:///C:/....image.ext'
+
+    #Drag and Drop
+
 class CropOverlay(QGraphicsItem):
     def __init__(self, scene):
         super().__init__()
@@ -187,7 +296,7 @@ class CropOverlay(QGraphicsItem):
         path = QPainterPath()
         path.addRect(self.scene.sceneRect())
         path.addRect(self.crop_selection)
-        #path.setFillRule(Qt.FillRule.OddEvenFill)
+        #path.setFillRule(Qt.FillRule.OddEvenFill) #Might be commented due to being default rule
         painter.setBrush(QColor(0, 0, 0, 128))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawPath(path)
