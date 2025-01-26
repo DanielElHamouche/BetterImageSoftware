@@ -11,7 +11,7 @@ import os
 from PIL import Image
 
 from BISDebug import DebugWindow # Debugging
-def debug_update(name, value):
+def debug_update(name, value): # Debugging
     pass
 
 
@@ -201,6 +201,8 @@ class ImageViewer(QGraphicsView):
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
         self.zoom_level = 1.0
+        self.factor = None
+        self.scale_factor = None
         self.image, self.pixmap = None, None
 
         self.crop_overlay = None
@@ -245,19 +247,18 @@ class ImageViewer(QGraphicsView):
 
     def wheelEvent(self, event):
         if self.image:
-            factor = 1.1 if event.angleDelta().y() > 0 else 0.9
-            #self.zoom_level *= factor
-            self.scale(factor, factor)
+            self.factor = 1.1 if event.angleDelta().y() > 0 else 0.9
+            # self.zoom_level *= self.factor
+            self.scale(self.factor, self.factor)
             self.updateSceneRect()
 
     def scaleView(self, event):
-        # print('scaleView')
         if self.image:
             width_scale  = self.width() / self.pixmap.width()
             height_scale = self.height() / self.pixmap.height()
-            scale_factor = min(width_scale, height_scale) / self.zoom_level
-            self.zoom_level *= scale_factor
-            self.scale(scale_factor, scale_factor)
+            self.scale_factor = min(width_scale, height_scale) / self.zoom_level
+            self.zoom_level *= self.scale_factor
+            self.scale(self.scale_factor, self.scale_factor)
             self.updateSceneRect()
     
     def updateSceneRect(self):
@@ -440,8 +441,8 @@ app = QApplication([])
 window = MainWindow()
 window.show()
     
-def debug_update(name, value):
-    window.variable_change.emit(name, value)
-    print(name, value)
+def debug_update(name, value): # Debugging
+    if name in ['zoom_level', 'scale_factor']:
+        window.variable_change.emit(name, value)
 
 app.exec()

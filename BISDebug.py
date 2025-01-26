@@ -11,7 +11,7 @@ class DebugWindow(QWidget):
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
         
-        self.variable_labels = {}
+        self.variable_labels = {'a': 'b'}
 
     def update_variable(self, name, value):
         """Update the displayed variable in the debug window."""
