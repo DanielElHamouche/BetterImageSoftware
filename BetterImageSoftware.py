@@ -15,6 +15,9 @@ def debug_update(name, value): # Debugging
     pass
 
 
+QImageReader.setAllocationLimit(0) #Max file size in memory (0 = no limit) 
+
+DEBUGGING = True
 CF_FILENAMEW = win32cb.RegisterClipboardFormat('FileNameW')
 CF_PNG       = win32cb.RegisterClipboardFormat('PNG')
 CF_TEXT      = win32cb.CF_TEXT
@@ -36,12 +39,12 @@ class MainWindow(QMainWindow):
     variable_change = pyqtSignal(str, object) # Debugging
     def __init__(self):
         super().__init__()
-
-        # Debugging
-        self.debug_window = DebugWindow()
-        self.variable_change.connect(self.debug_window.update_variable)
-        self.debug_window.show()
-        #
+        if DEBUGGING == True:
+            # Debugging
+            self.debug_window = DebugWindow()
+            self.variable_change.connect(self.debug_window.update_variable)
+            self.debug_window.show()
+            #
 
         self.setWindowTitle("Better Image Software : ALPHA")
         init_window_w, init_window_h = 750, 750 
@@ -201,10 +204,9 @@ class ImageViewer(QGraphicsView):
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
         self.zoom_level = 1.0
-        self.factor = None
-        self.scale_factor = None
+        self.factor, self.scale_factor = None, None
+        self.width_scale, self.height_scale = None, None
         self.image, self.pixmap = None, None
-
         self.crop_overlay = None
         self.crop_selection = None
         self.is_cropping = False
@@ -246,6 +248,7 @@ class ImageViewer(QGraphicsView):
         super().mouseReleaseEvent(event)
 
     def wheelEvent(self, event):
+        #Current functionality leaves factor, zoom_level, and scale_factor to be useless information.
         if self.image:
             self.factor = 1.1 if event.angleDelta().y() > 0 else 0.9
             # self.zoom_level *= self.factor
@@ -254,9 +257,9 @@ class ImageViewer(QGraphicsView):
 
     def scaleView(self, event):
         if self.image:
-            width_scale  = self.width() / self.pixmap.width()
-            height_scale = self.height() / self.pixmap.height()
-            self.scale_factor = min(width_scale, height_scale) / self.zoom_level
+            self.width_scale  = self.width() / self.pixmap.width()
+            self.height_scale = self.height() / self.pixmap.height()
+            self.scale_factor = min(self.width_scale, self.height_scale) / self.zoom_level
             self.zoom_level *= self.scale_factor
             self.scale(self.scale_factor, self.scale_factor)
             self.updateSceneRect()
@@ -405,7 +408,8 @@ class CropSelection(QGraphicsRectItem):
         self.updateHandles()
 
     def mousePressEvent(self, event):
-        if Qt.KeyboardModifier.ControlModifier not in event.modifiers():
+        #not sure which feels more intuitive. Default to move image, or move crop region. Another option is to move by grabbing edge of crop selection.
+        if Qt.KeyboardModifier.ControlModifier in event.modifiers():
             self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)  
         self.start_pos = event.pos()
         self.mouse_press_rect = self.rect()
@@ -442,7 +446,8 @@ window = MainWindow()
 window.show()
     
 def debug_update(name, value): # Debugging
-    if name in ['zoom_level', 'scale_factor']:
-        window.variable_change.emit(name, value)
+    window.variable_change.emit(name, value)
+    # if name not in ['zoom_level', 'scale_factor']:
+    #     window.variable_change.emit(name, value)
 
 app.exec()
