@@ -1,5 +1,2 @@
-old_versions/
-images/
-test.ipynb
-tempCodeRunnerFile.py
-tempCodeRunnerFile.python
+ignore/
+__pycache__/

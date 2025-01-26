@@ -2,13 +2,24 @@ from PyQt6.QtGui import *
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 
-import win32clipboard as win32cb #Copy Pasting Functionality
+import win32clipboard as win32cb # Copy Pasting Functionality (LOOK INTO DEFAULT pyqt6 clipboard features)
 import win32api
 from io import BytesIO
 import os
 
-#TEMP FIX
+# TEMP FIX (Might not be temp?)
 from PIL import Image
+
+from BISDebug import DebugWindow # Debugging
+def debug_update(name, value):
+    pass
+
+
+CF_FILENAMEW = win32cb.RegisterClipboardFormat('FileNameW')
+CF_PNG       = win32cb.RegisterClipboardFormat('PNG')
+CF_TEXT      = win32cb.CF_TEXT
+CF_DIBV5     = win32cb.CF_DIBV5
+
 def convert_dib_to_png_bytes(dib_data: bytes) -> bytes:
     # Open the DIBV5 data using Pillow
     with BytesIO(dib_data) as input_stream:
@@ -21,17 +32,18 @@ def convert_dib_to_png_bytes(dib_data: bytes) -> bytes:
 
     return png_data
 
-CF_FILENAMEW = win32cb.RegisterClipboardFormat('FileNameW')
-CF_PNG       = win32cb.RegisterClipboardFormat('PNG')
-CF_TEXT      = win32cb.CF_TEXT
-CF_DIBV5     = win32cb.CF_DIBV5
-
 class MainWindow(QMainWindow):
+    variable_change = pyqtSignal(str, object) # Debugging
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Better Image Software : ALPHA")
+        # Debugging
+        self.debug_window = DebugWindow()
+        self.variable_change.connect(self.debug_window.update_variable)
+        self.debug_window.show()
+        #
 
+        self.setWindowTitle("Better Image Software : ALPHA")
         init_window_w, init_window_h = 750, 750 
         display_w = win32api.GetSystemMetrics(0)
         display_h = win32api.GetSystemMetrics(1)
@@ -48,13 +60,17 @@ class MainWindow(QMainWindow):
         self.button_open_file.triggered.connect(self.dialog_open_file)
         self.file_menu.addAction(self.button_open_file)
 
+    def __setattr__(self, name, value): # Debugging __setattr__ Updates tracked variables in DebugWindow when updated.
+        debug_update(name, value)
+        super().__setattr__(name, value)    
+
     def dialog_open_file(self):
         dialog = QFileDialog()
         file, _ = dialog.getOpenFileName(self, "Select an Image", filter="Images (*.png *.jpg *.jpeg *.bmp *.gif)") #Update later to be generated from an array
         if file:
             self.centralWidget.view.setImage(file)
 
-    def keyPressEvent(self, event: QKeyEvent | None): #Switch to a dict for better organization and faster lookup
+    def keyPressEvent(self, event: QKeyEvent | None): # Switch to a dict for better organization and faster lookup
         if event.key() == Qt.Key.Key_Escape:
             QApplication.quit()
         elif event.key() == Qt.Key.Key_F11:
@@ -165,6 +181,10 @@ class CentralWidget(QWidget):
         layout.addWidget(self.view)
         layout.setContentsMargins(30, 30, 30, 30)
         self.setLayout(layout)
+    
+    def __setattr__(self, name, value): # Debugging
+        debug_update(name, value)
+        super().__setattr__(name, value)
         
 class ImageViewer(QGraphicsView):
     def __init__(self):
@@ -186,6 +206,10 @@ class ImageViewer(QGraphicsView):
         self.crop_overlay = None
         self.crop_selection = None
         self.is_cropping = False
+
+    def __setattr__(self, name, value): # Debugging
+        debug_update(name, value)
+        super().__setattr__(name, value)
 
     def setImage(self, data : str | bytes): #img is a str filepath or bytes of img data
         """
@@ -227,6 +251,7 @@ class ImageViewer(QGraphicsView):
             self.updateSceneRect()
 
     def scaleView(self, event):
+        # print('scaleView')
         if self.image:
             width_scale  = self.width() / self.pixmap.width()
             height_scale = self.height() / self.pixmap.height()
@@ -414,4 +439,9 @@ class CropSelection(QGraphicsRectItem):
 app = QApplication([])
 window = MainWindow()
 window.show()
+    
+def debug_update(name, value):
+    window.variable_change.emit(name, value)
+    print(name, value)
+
 app.exec()
