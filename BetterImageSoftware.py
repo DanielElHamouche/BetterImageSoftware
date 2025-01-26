@@ -2,13 +2,15 @@ from PyQt6.QtGui import *
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 
+# TEMP FIX (Might not be temp?)
+from PIL import Image
+
 import win32clipboard as win32cb # Copy Pasting Functionality (LOOK INTO DEFAULT pyqt6 clipboard features)
 import win32api
 from io import BytesIO
 import os
 
-# TEMP FIX (Might not be temp?)
-from PIL import Image
+from CustomWidgets import *
 
 from BISDebug import DebugWindow # Debugging
 def debug_update(name, value): # Debugging
@@ -35,6 +37,7 @@ def convert_dib_to_png_bytes(dib_data: bytes) -> bytes:
 
     return png_data
 
+
 class MainWindow(QMainWindow):
     variable_change = pyqtSignal(str, object) # Debugging
     def __init__(self):
@@ -58,10 +61,15 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.centralWidget)
 
         self.menu = self.menuBar()
+        self.menu.setStyleSheet("background-color: blue; color: white;")
         self.file_menu = self.menu.addMenu("&File")
         self.button_open_file = QAction("&Open File  (Ctrl + O)")
         self.button_open_file.triggered.connect(self.dialog_open_file)
         self.file_menu.addAction(self.button_open_file)
+
+        self.status_bar = CustomStatusBar()
+        self.setStatusBar(self.status_bar)
+
 
     def __setattr__(self, name, value): # Debugging __setattr__ Updates tracked variables in DebugWindow when updated.
         debug_update(name, value)
@@ -182,7 +190,7 @@ class CentralWidget(QWidget):
         layout = QVBoxLayout()
         self.view = ImageViewer()
         layout.addWidget(self.view)
-        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setContentsMargins(20, 20, 20, 0)
         self.setLayout(layout)
     
     def __setattr__(self, name, value): # Debugging
