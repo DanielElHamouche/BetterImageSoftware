@@ -63,9 +63,14 @@ class MainWindow(QMainWindow):
         self.menu = self.menuBar()
         self.menu.setStyleSheet("background-color: blue; color: white;")
         self.file_menu = self.menu.addMenu("&File")
-        self.button_open_file = QAction("&Open File  (Ctrl + O)")
-        self.button_open_file.triggered.connect(self.dialog_open_file)
-        self.file_menu.addAction(self.button_open_file)
+        
+        self.btn_open_file = QAction("&Open File  (Ctrl + O)")
+        self.btn_open_file.triggered.connect(self.dialog_open_file)
+        self.file_menu.addAction(self.btn_open_file)
+
+        self.btn_save_file = QAction("&Save File  (Ctrl + S)")
+        self.btn_save_file.triggered.connect(self.save)
+        self.file_menu.addAction(self.btn_save_file)
 
         self.status_bar = CustomStatusBar()
         self.setStatusBar(self.status_bar)
