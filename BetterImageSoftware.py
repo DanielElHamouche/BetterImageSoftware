@@ -12,14 +12,10 @@ import os
 
 from CustomWidgets import *
 
-from BISDebug import DebugWindow # Debugging
-def debug_update(name, value): # Debugging
-    pass
-
+from BISDebug import DebugMixin, get_debug_mananger
 
 QImageReader.setAllocationLimit(0) #Max file size in memory (0 = no limit) 
 
-DEBUGGING = True
 CF_FILENAMEW = win32cb.RegisterClipboardFormat('FileNameW')
 CF_PNG       = win32cb.RegisterClipboardFormat('PNG')
 CF_TEXT      = win32cb.CF_TEXT
@@ -36,19 +32,9 @@ def convert_dib_to_png_bytes(dib_data: bytes) -> bytes:
             png_data = output_stream.getvalue()
 
     return png_data
-
-
-class MainWindow(QMainWindow):
-    variable_change = pyqtSignal(str, object) # Debugging
+class MainWindow(QMainWindow, DebugMixin):
     def __init__(self):
         super().__init__()
-        if DEBUGGING == True:
-            # Debugging
-            self.debug_window = DebugWindow()
-            self.variable_change.connect(self.debug_window.update_variable)
-            self.debug_window.show()
-            #
-
         self.setWindowTitle("Better Image Software : ALPHA")
         init_window_w, init_window_h = 750, 750 
         display_w = win32api.GetSystemMetrics(0)
@@ -63,7 +49,7 @@ class MainWindow(QMainWindow):
         self.menu = self.menuBar()
         self.menu.setStyleSheet("background-color: blue; color: white;")
         self.file_menu = self.menu.addMenu("&File")
-        
+
         self.btn_open_file = QAction("&Open File  (Ctrl + O)")
         self.btn_open_file.triggered.connect(self.dialog_open_file)
         self.file_menu.addAction(self.btn_open_file)
@@ -73,12 +59,7 @@ class MainWindow(QMainWindow):
         self.file_menu.addAction(self.btn_save_file)
 
         self.status_bar = CustomStatusBar()
-        self.setStatusBar(self.status_bar)
-
-
-    def __setattr__(self, name, value): # Debugging __setattr__ Updates tracked variables in DebugWindow when updated.
-        debug_update(name, value)
-        super().__setattr__(name, value)    
+        self.setStatusBar(self.status_bar) 
 
     def dialog_open_file(self):
         dialog = QFileDialog()
@@ -91,7 +72,7 @@ class MainWindow(QMainWindow):
             QApplication.quit()
         elif event.key() == Qt.Key.Key_F11:
             self.centralWidget.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
-            window.showNormal() if window.isFullScreen() else window.showFullScreen()
+            self.showNormal() if self.isFullScreen() else self.showFullScreen()
             self.centralWidget.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         elif event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_O:
             self.dialog_open_file()
@@ -112,6 +93,9 @@ class MainWindow(QMainWindow):
             print("KeyBind [2] -> print crop_selection.rect()")
             if self.centralWidget.view.crop_selection:
                 print(self.centralWidget.view.crop_selection.rect())
+        elif event.key() == Qt.Key.Key_F10:
+            a = get_debug_mananger()
+            a.toggle_debug()
         return super().keyPressEvent(event)
     
     def copy(self):
@@ -167,28 +151,29 @@ class MainWindow(QMainWindow):
         PNG -> PNG : max compression | metadata (y|n)
         JPG -> JPG : Quality 100
         """
-        img = self.centralWidget.view.pixmap.toImage()
-        print(type(img))
+        if pixmap:= self.centralWidget.view.pixmap:
+            img = pixmap.toImage()
+            print(type(img))
 
-        buffer = QBuffer()
-        buffer.setData(QByteArray())  # Initialize the buffer with an empty byte array
-        buffer.open(QBuffer.OpenModeFlag.WriteOnly)
-        
-        # Save QImage to the buffer in PNG format (you can change format)
-        img.save(buffer, "PNG")
-        
-        # Get the raw image data from the buffer
-        byte_data = buffer.data()
+            buffer = QBuffer()
+            buffer.setData(QByteArray())  # Initialize the buffer with an empty byte array
+            buffer.open(QBuffer.OpenModeFlag.WriteOnly)
+            
+            # Save QImage to the buffer in PNG format (you can change format)
+            img.save(buffer, "PNG")
+            
+            # Get the raw image data from the buffer
+            byte_data = buffer.data()
 
-        # Convert byte data to a bytes-like object that Pillow can work with
-        pil_image = Image.open(BytesIO(byte_data))
-        # pil_image.save('output_image.webp', format='WebP', lossless = True, quality = 100)
-        pil_image.save('output.png', format='PNG', optimize = True)
+            # Convert byte data to a bytes-like object that Pillow can work with
+            pil_image = Image.open(BytesIO(byte_data))
+            # pil_image.save('output_image.webp', format='WebP', lossless = True, quality = 100)
+            pil_image.save('output.png', format='PNG', optimize = True)
     
     def resizeEvent(self, event):
         self.centralWidget.view.scaleView(None)
 
-class CentralWidget(QWidget):
+class CentralWidget(QWidget, DebugMixin):
     def __init__(self):
         super().__init__()
 
@@ -197,12 +182,8 @@ class CentralWidget(QWidget):
         layout.addWidget(self.view)
         layout.setContentsMargins(20, 20, 20, 0)
         self.setLayout(layout)
-    
-    def __setattr__(self, name, value): # Debugging
-        debug_update(name, value)
-        super().__setattr__(name, value)
         
-class ImageViewer(QGraphicsView):
+class ImageViewer(QGraphicsView, DebugMixin):
     def __init__(self):
         super().__init__()
 
@@ -223,10 +204,6 @@ class ImageViewer(QGraphicsView):
         self.crop_overlay = None
         self.crop_selection = None
         self.is_cropping = False
-
-    def __setattr__(self, name, value): # Debugging
-        debug_update(name, value)
-        super().__setattr__(name, value)
 
     def setImage(self, data : str | bytes): #img is a str filepath or bytes of img data
         """
@@ -325,7 +302,7 @@ class ImageViewer(QGraphicsView):
 
     #Drag and Drop
 
-class CropOverlay(QGraphicsItem):
+class CropOverlay(QGraphicsItem, DebugMixin):
     def __init__(self, scene):
         super().__init__()
         self.scene = scene
@@ -347,7 +324,7 @@ class CropOverlay(QGraphicsItem):
         self.crop_selection = crop_selection
         self.update()
 
-class CropSelection(QGraphicsRectItem):
+class CropSelection(QGraphicsRectItem, DebugMixin):
     def __init__(self, x, y, width, height, crop_overlay):
         super().__init__(x, y, width, height)
 
@@ -453,14 +430,3 @@ class CropSelection(QGraphicsRectItem):
         painter.setBrush(QBrush(QColor(255, 255, 255), Qt.BrushStyle.SolidPattern))
         for handle in self.handles.values():
             painter.drawRect(handle)
-
-app = QApplication([])
-window = MainWindow()
-window.show()
-    
-def debug_update(name, value): # Debugging
-    window.variable_change.emit(name, value)
-    # if name not in ['zoom_level', 'scale_factor']:
-    #     window.variable_change.emit(name, value)
-
-app.exec()

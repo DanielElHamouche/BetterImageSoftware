@@ -59,3 +59,74 @@ class CustomStatusBar(QStatusBar):
         menu.addAction(action1)
         menu.addAction(action2)
         menu.exec(self.mapToGlobal(pos))
+
+
+class TestWidget(QDialog):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        tab_widget = QTabWidget(self)
+        tab1 = TabOne()
+        tab2 = TabTwo()
+        tab_widget.addTab(tab1, 'Tab 1')
+        tab_widget.addTab(tab2, 'Tab 2')
+
+        layout.addWidget(tab_widget)
+
+class TabTwo(QWidget):
+    def __init__(self):
+        super().__init__()
+        tw = QTreeWidget()
+        tw.setAlternatingRowColors(True)
+        tw.setHeaderLabels(['HELLO', 'TEST'])
+        item = QTreeWidgetItem(tw, ['1', '2'])
+        QTreeWidgetItem(item, ['3', '4'])
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(tw)
+
+class TabOne(QWidget):
+    def __init__(self):
+        super().__init__()
+        data_model = DebugItemModel()
+        data_model.update_variable({
+            'name': 'aga_name',
+            'class': 'aga_class',
+            'instance_id': 'aga_instance_id',
+            'type': 'aga_type',
+            'value': 'aga_value',
+            'timestamp': 'aga_timestamp'
+            })
+        tree_view = QTreeView()
+        tree_view.setModel(data_model)
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(tree_view)
+
+class DebugItemModel(QStandardItemModel):
+    def __init__(self):
+        super().__init__()
+        self.model_items = {}
+
+    def update_variable(self, var_info: dict):
+        """
+        Updates or adds a variable's data to the ItemModel
+        Maintains a dict model_items with {var_name: {attribute: QStandardIten(str(value)) for attribute, value in var_info.items()}}
+        Parameters:
+        var_info (dict):    A dictionary containing variable information.
+                            Must include a 'name' key used as a unique identifier.
+        """
+        var_name = var_info['name']
+
+        if self.horizontalHeaderItem(0) == None:
+            self.setHorizontalHeaderLabels(list(var_info.keys()))
+        if var_name in self.model_items:
+            for k, v in var_info.items(): 
+                self.model_items[var_name][k].setText(v)
+        else:
+            self.model_items[var_name] = {k: QStandardItem(str(v)) for k, v in var_info.items()}
+            self.appendRow(list(self.model_items[var_name].values()))
