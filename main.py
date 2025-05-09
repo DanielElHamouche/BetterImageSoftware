@@ -2,7 +2,7 @@ import sys
 from PyQt6.QtWidgets import QApplication
 from BetterImageSoftware import MainWindow
 from BISDebug import *
-from CustomWidgets import *
+from ignore.CustomWidgets import *
 DEBUGGING_ON_START = True
 
 

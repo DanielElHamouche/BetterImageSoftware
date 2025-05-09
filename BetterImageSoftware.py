@@ -10,7 +10,7 @@ import win32api
 from io import BytesIO
 import os
 
-from CustomWidgets import *
+from ignore.CustomWidgets import *
 
 from BISDebug import DebugMixin, get_debug_mananger
 
